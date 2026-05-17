@@ -88,3 +88,13 @@ class YOLOv8Detector(BaseDetector):
             self.load_model()
         dummy = np.zeros((640, 640, 3), dtype=np.uint8)
         self.detect(dummy)
+
+    def get_class_names(self) -> dict:
+        """Get class names from the model."""
+        if self._model is None:
+            self.load_model()
+        names = self._model.names
+        if isinstance(names, dict):
+            return names
+        # If names is a list, convert to dict
+        return {i: name for i, name in enumerate(names)}

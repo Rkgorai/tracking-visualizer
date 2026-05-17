@@ -60,11 +60,25 @@ streamlit run app.py
 5. **Click "Run Tracking"** to process the video
 6. **Explore results**: View visualization, inspect frames, download results
 
+### CLI Testing
+
+For batch testing and comparison:
+```bash
+# Test all trackers on a video
+python test_trackers.py --video input.mp4 --model yolov8n.pt
+
+# Filter by class (0=person, 2=car) and skip frames for speed
+python test_trackers.py --video input.mp4 --model yolov8n.pt --classes 0 2 --frame-skip 5
+```
+
+Arguments: `--video`, `--model`, `--conf`, `--classes`, `--frame-skip`, `--max-width`, `--start-frame`, `--output`
+
 ## Project Structure
 
 ```
-visual/
+.
 ├── app.py                     # Main Streamlit application
+├── test_trackers.py           # CLI test script for comparing trackers
 ├── requirements.txt           # Python dependencies
 ├── README.md                  # This file
 ├── trackers/                  # Tracking algorithms

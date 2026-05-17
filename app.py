@@ -31,6 +31,26 @@ DETECTOR_OPTIONS = {
     "YOLOv8-medium": "yolov8m.pt",
 }
 
+# Default COCO classes (fallback)
+DEFAULT_COCO_CLASSES = {
+    0: "person", 1: "bicycle", 2: "car", 3: "motorcycle", 4: "airplane",
+    5: "bus", 6: "train", 7: "truck", 8: "boat", 9: "traffic light",
+    10: "fire hydrant", 11: "stop sign", 12: "parking meter", 13: "bench",
+    14: "bird", 15: "cat", 16: "dog", 17: "horse", 18: "sheep", 19: "cow",
+    20: "elephant", 21: "bear", 22: "zebra", 23: "giraffe", 24: "backpack",
+    25: "umbrella", 26: "handbag", 27: "tie", 28: "suitcase", 29: "frisbee",
+    30: "skis", 31: "snowboard", 32: "sports ball", 33: "kite", 34: "baseball bat",
+    35: "baseball glove", 36: "surfboard", 37: "tennis racket", 38: "bottle",
+    39: "wine glass", 40: "cup", 41: "fork", 42: "knife", 43: "spoon",
+    44: "bowl", 45: "banana", 46: "apple", 47: "sandwich", 48: "orange",
+    49: "broccoli", 50: "carrot", 51: "hot dog", 52: "pizza", 53: "donut",
+    54: "cake", 55: "chair", 56: "couch", 57: "potted plant", 58: "bed",
+    59: "dining table", 60: "toilet", 61: "tv", 62: "laptop", 63: "mouse",
+    64: "remote", 65: "keyboard", 66: "cell phone", 67: "microwave", 68: "oven",
+    69: "toaster", 70: "sink", 71: "refrigerator", 72: "book", 73: "clock",
+    74: "vase", 75: "scissors", 76: "teddy bear", 77: "hair drier", 78: "toothbrush"
+}
+
 
 def initialize_tracker(tracker_name: str) -> BaseTracker:
     """Initialize tracker with default parameters."""
@@ -39,9 +59,9 @@ def initialize_tracker(tracker_name: str) -> BaseTracker:
     if tracker_name == "SORT":
         return tracker_class(max_age=30, min_hits=3, iou_threshold=0.3)
     elif tracker_name == "ByteTrack":
-        return tracker_class(track_thresh=0.5, lost_track_buffer=30, track_iou_threshold=0.5)
+        return tracker_class(track_thresh=0.3, lost_track_buffer=30, track_iou_threshold=0.3)
     elif tracker_name == "OC-SORT":
-        return tracker_class(det_thresh=0.5, max_age=30, iou_threshold=0.3, delta_t=3)
+        return tracker_class(det_thresh=0.3, max_age=30, iou_threshold=0.3, delta_t=3)
     elif tracker_name == "DeepSORT":
         return tracker_class(max_age=30, min_hits=3, iou_threshold=0.3, max_cosine_distance=0.2)
     elif tracker_name == "StrongSORT":
@@ -52,10 +72,15 @@ def initialize_tracker(tracker_name: str) -> BaseTracker:
         return tracker_class()
 
 
-def initialize_detector(detector_name: str, conf_threshold: float) -> YOLOv8Detector:
-    """Initialize detector."""
-    model_path = DETECTOR_OPTIONS.get(detector_name, "yolov8n.pt")
-    return YOLOv8Detector(model_path=model_path, conf_threshold=conf_threshold)
+def initialize_detector(detector_name: str, conf_threshold: float, custom_classes: dict = None, custom_model_path: str = None) -> YOLOv8Detector:
+    """Initialize detector with optional custom model and classes."""
+    if custom_model_path:
+        model_path = custom_model_path
+    else:
+        model_path = DETECTOR_OPTIONS.get(detector_name, "yolov8n.pt")
+
+    classes = custom_classes if custom_classes else None
+    return YOLOv8Detector(model_path=model_path, conf_threshold=conf_threshold, classes=classes)
 
 
 def process_video(
@@ -66,31 +91,16 @@ def process_video(
     progress_bar,
     frame_skip: int = 3,
     max_width: int = 640,
-    filter_class: int = None
+    filter_classes: list = None,
+    custom_classes: dict = None,
+    custom_model_path: str = None
 ) -> tuple:
     """Process video and return tracking results. Saves annotated video to disk."""
 
-    # COCO class names mapping
-    COCO_CLASSES = {
-        0: "person", 1: "bicycle", 2: "car", 3: "motorcycle", 4: "airplane",
-        5: "bus", 6: "train", 7: "truck", 8: "boat", 9: "traffic light",
-        10: "fire hydrant", 11: "stop sign", 12: "parking meter", 13: "bench",
-        14: "bird", 15: "cat", 16: "dog", 17: "horse", 18: "sheep", 19: "cow",
-        20: "elephant", 21: "bear", 22: "zebra", 23: "giraffe", 24: "backpack",
-        25: "umbrella", 26: "handbag", 27: "tie", 28: "suitcase", 29: "frisbee",
-        30: "skis", 31: "snowboard", 32: "sports ball", 33: "kite", 34: "baseball bat",
-        35: "baseball glove", 36: "surfboard", 37: "tennis racket", 38: "bottle",
-        39: "wine glass", 40: "cup", 41: "fork", 42: "knife", 43: "spoon",
-        44: "bowl", 45: "banana", 46: "apple", 47: "sandwich", 48: "orange",
-        49: "broccoli", 50: "carrot", 51: "hot dog", 52: "pizza", 53: "donut",
-        54: "cake", 55: "chair", 56: "couch", 57: "potted plant", 58: "bed",
-        59: "dining table", 60: "toilet", 61: "tv", 62: "laptop", 63: "mouse",
-        64: "remote", 65: "keyboard", 66: "cell phone", 67: "microwave", 68: "oven",
-        69: "toaster", 70: "sink", 71: "refrigerator", 72: "book", 73: "clock",
-        74: "vase", 75: "scissors", 76: "teddy bear", 77: "hair drier", 78: "toothbrush"
-    }
+    # COCO class names mapping (fallback)
+    COCO_CLASSES = DEFAULT_COCO_CLASSES
 
-    detector = initialize_detector(detector_name, conf_threshold)
+    detector = initialize_detector(detector_name, conf_threshold, custom_classes, custom_model_path)
     detector.warmup()
 
     tracker = initialize_tracker(tracker_name)
@@ -165,13 +175,13 @@ def process_video(
                 class_names = [d.class_name for d in detections]
                 print(f"Frame {frame_idx}: Detected class_ids={class_ids}, class_names={class_names}")
 
-            # Filter by class if specified
-            if filter_class is not None:
-                detections = [d for d in detections if d.class_id == filter_class]
+            # Filter by class(es) if specified
+            if filter_classes is not None:
+                detections = [d for d in detections if d.class_id in filter_classes]
 
             # Debug: Print after filter
             if frame_idx < 3:
-                print(f"Frame {frame_idx}: {len(detections)} detections after filter (filter_class={filter_class})")
+                print(f"Frame {frame_idx}: {len(detections)} detections after filter (filter_classes={filter_classes})")
 
             # Scale bbox back to original size for tracking
             h, w = frame.shape[:2]
@@ -246,12 +256,52 @@ def main():
         )
 
         # Detector selection
-        detector_name = st.sidebar.selectbox(
-            "Select Detector",
-            options=list(DETECTOR_OPTIONS.keys()),
+        st.sidebar.header("Detector")
+        model_type = st.sidebar.radio(
+            "Model Type",
+            options=["Default YOLOv8", "Custom Model"],
             index=0,
-            help="Choose object detector"
+            help="Choose between default YOLOv8 models or upload your own fine-tuned model"
         )
+
+        custom_model_path = None
+        custom_classes = None
+
+        if model_type == "Default YOLOv8":
+            detector_name = st.sidebar.selectbox(
+                "Select Detector",
+                options=list(DETECTOR_OPTIONS.keys()),
+                index=0,
+                help="Choose YOLOv8 model size"
+            )
+        else:
+            # Custom model upload
+            uploaded_model = st.sidebar.file_uploader(
+                "Upload Custom Model",
+                type=["pt", "pth"],
+                help="Upload your fine-tuned YOLO model (.pt or .pth)"
+            )
+
+            if uploaded_model:
+                # Save uploaded model temporarily
+                model_dir = Path("temp")
+                model_dir.mkdir(exist_ok=True)
+                custom_model_path = str(model_dir / uploaded_model.name)
+
+                with open(custom_model_path, "wb") as f:
+                    f.write(uploaded_model.read())
+
+                # Auto-detect classes from model
+                temp_detector = YOLOv8Detector(model_path=custom_model_path, conf_threshold=0.5)
+                custom_classes = temp_detector.get_class_names()
+
+                st.sidebar.success(f"Loaded: {uploaded_model.name} ({len(custom_classes)} classes)")
+
+                detector_name = "Custom"  # marker for custom model
+            else:
+                detector_name = "YOLOv8-nano"  # default fallback
+                custom_classes = DEFAULT_COCO_CLASSES
+                st.sidebar.info("Upload a model to use custom classes")
 
         # Parameters
         conf_threshold = st.sidebar.slider(
@@ -264,24 +314,25 @@ def main():
 
         # Class filtering - what to track
         st.sidebar.header("Object Classes")
-        class_options = {
-            "All Objects": None,
-            "Person": 0,
-            "Car": 2,
-            "Bicycle": 1,
-            "Motorcycle": 3,
-            "Bus": 5,
-            "Truck": 7,
-            "Dog": 16,
-            "Cat": 15,
-            "Bird": 14,
-        }
-        selected_class = st.sidebar.selectbox(
-            "Track Only",
-            options=list(class_options.keys()),
-            index=0,
-            help="Select which object class to track (None = all objects)"
+
+        # Determine available classes based on model type
+        if model_type == "Default YOLOv8":
+            available_classes = DEFAULT_COCO_CLASSES
+        else:
+            available_classes = custom_classes if custom_classes else DEFAULT_COCO_CLASSES
+
+        # Build class options for selection (class_name -> class_id)
+        class_list = list(available_classes.items())
+
+        selected_classes = st.sidebar.multiselect(
+            "Track Only (select classes)",
+            options=[name for _, name in class_list],
+            default=[],
+            help="Select which object classes to track (empty = all objects)"
         )
+
+        # Convert selected class names to IDs
+        selected_class_ids = [cid for cid, name in class_list if name in selected_classes] if selected_classes else None
 
         # Performance options
         st.sidebar.header("Performance")
@@ -294,14 +345,14 @@ def main():
 
         max_width = st.sidebar.selectbox(
             "Max Frame Width",
-            options=[320, 480, 640, 960, 1280],
-            index=2,
-            help="Resize frames to this max width for faster detection"
+            options=[320, 480, 640, 960, 1280, 1920, 2560],
+            index=4,
+            help="Resize frames to this max width for faster detection (larger = more accurate)"
         )
 
         # Process button
         if st.sidebar.button("Run Tracking", type="primary"):
-            filter_info = f" tracking {selected_class}" if selected_class != "All Objects" else ""
+            filter_info = f" tracking {selected_classes}" if selected_classes else ""
             with st.spinner(f"Processing video{filter_info}... This may take a while."):
                 progress_bar = st.progress(0)
 
@@ -313,7 +364,9 @@ def main():
                     progress_bar,
                     frame_skip=frame_skip,
                     max_width=max_width,
-                    filter_class=class_options[selected_class]
+                    filter_classes=selected_class_ids,
+                    custom_classes=custom_classes if model_type == "Custom Model" else None,
+                    custom_model_path=custom_model_path
                 )
 
                 # Handle return values

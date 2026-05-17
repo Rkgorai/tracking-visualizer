@@ -106,10 +106,13 @@ class OCSortTracker(BaseTracker):
         iou_matrix = self.iou_batch(track_bboxes, det_bboxes)
 
         # Apply OCR (Observation-Centric Recovery)
-        for track_id, obs in self.observations.items():
+        track_ids_list = list(self.tracks.keys())
+        for idx, (track_id, obs) in enumerate(self.observations.items()):
             if len(obs) < self.delta_t:
                 continue
-            # Direction-aware matching
+            # Direction-aware matching - use idx not track_id for matrix indexing
+            if idx >= len(track_bboxes):
+                continue
             recent_obs = np.array(obs[-self.delta_t:])
             if len(recent_obs) >= 2:
                 direction = recent_obs[-1] - recent_obs[0]
@@ -119,7 +122,7 @@ class OCSortTracker(BaseTracker):
                         pred_center = recent_obs[-1] + direction
                         dir_diff = det_center - pred_center
                         if np.linalg.norm(dir_diff) < 50:  # Direction threshold
-                            iou_matrix[track_id, i] *= 1.2  # Boost IoU
+                            iou_matrix[idx, i] *= 1.2  # Boost IoU
 
         return self._match(iou_matrix, self.iou_threshold)
 
